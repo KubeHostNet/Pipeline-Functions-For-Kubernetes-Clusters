@@ -17,25 +17,29 @@ def checkIfRoutesWereAdded( route_table_id, cidr_subnet_list, myRegion):
     return routeResult
 
 def checkIfRouteWasAdded( rtID, cidrDestination, myRegion):
-    print("Inside checkIfRouteWasAdded()")
-    myNewCommand="aws --region "+myRegion+" ec2 describe-route-tables --route-table-ids "+rtID+" --filters Name=route.destination-cidr-block,Values="+cidrDestination
-    proc = subprocess.Popen( myNewCommand,stdout=subprocess.PIPE, shell=True)
-    while True:
-      line = proc.stdout.readline()
-      if line:
-        thetext=line.decode('utf-8').rstrip('\r|\n')
-        decodedline=ansi_escape.sub('', thetext)
-        if "\"RouteTables\": []" in decodedline:  
-          print(decodedline)
-          print("No matching routes found! Need to retry.")
-          return "FAIL"
-        if "\"DestinationCidrBlock\":" in decodedline:  
-          if cidrDestination in decodedline:
-            print(decodedline)
-            return "PASS"
-      else:
-        return "FAIL"
-        break
+    try:
+        print("Inside checkIfRouteWasAdded()")
+        myNewCommand="aws --region "+myRegion+" ec2 describe-route-tables --route-table-ids "+rtID+" --filters Name=route.destination-cidr-block,Values="+cidrDestination
+        proc = subprocess.Popen( myNewCommand,stdout=subprocess.PIPE, shell=True)
+        while True:
+          line = proc.stdout.readline()
+          if line:
+            thetext=line.decode('utf-8').rstrip('\r|\n')
+            decodedline=ansi_escape.sub('', thetext)
+            if "\"RouteTables\": []" in decodedline:  
+              print(decodedline)
+              print("No matching routes found! Need to retry.")
+              return "FAIL"
+            if "\"DestinationCidrBlock\":" in decodedline:  
+              if cidrDestination in decodedline:
+                print(decodedline)
+                return "PASS"
+          else:
+            return "FAIL"
+            break
+    except Exception as e:
+        print("stdout output:\n", e.output)
+        sys.exit()
 
 def validateKubernetesHostNetwork(cidr_sub_list_k8s, sg_k8s_nodes, cidr_vpc_k8s, vpcid_k8s, route_tbl_id_k8s_host):
     success='true'

@@ -7,6 +7,7 @@ import networkdeploymentfunctions as ndep
 import networkvalidation as nval
 import time
 import os
+import sys
   
 ###############################################################################################
 ## FUNCTIONS BELOW NEED TO BE MOVED OUT INTO SEPARATE MODULES AND THEN IMPORTED BY REFERENCE.
@@ -32,12 +33,16 @@ myRegion="us-west-2"
 ################################################################################  
 ### 1. DEPLOY THE KUBERNETES HOST NETWORK
 ################################################################################  
-ndep.runTerraformOperation( os.environ['TF_VAR_COMMAND_TO_CALL_K8S_MODULE'], os.environ['TF_VAR_PATH_TO_CALL_TO_K8S_MODULE'])
-ndep.checkOutputsOfKubernetesHostNetwork('python3 pipeline-kubeadm-network-output.py', os.environ['TF_VAR_PATH_TO_CALL_TO_K8S_MODULE'])
-nval.validateKubernetesHostNetwork(ndep.cidr_subnet_list_kubernetes, ndep.security_group_id_kubernetes_nodes, ndep.cidr_vpc_kubernetes, ndep.vpc_id_kubernetes, ndep.route_table_id_kubernetes_host)
-print("                                  ")
-print("  **** Finished Step 1: Deploying Kubernetes Host Network. ****")
-print("                                  ")
+try:
+    ndep.runTerraformOperation( os.environ['TF_VAR_COMMAND_TO_CALL_K8S_MODULE'], os.environ['TF_VAR_PATH_TO_CALL_TO_K8S_MODULE'])
+    ndep.checkOutputsOfKubernetesHostNetwork('python3 pipeline-kubeadm-network-output.py', os.environ['TF_VAR_PATH_TO_CALL_TO_K8S_MODULE'])
+    nval.validateKubernetesHostNetwork(ndep.cidr_subnet_list_kubernetes, ndep.security_group_id_kubernetes_nodes, ndep.cidr_vpc_kubernetes, ndep.vpc_id_kubernetes, ndep.route_table_id_kubernetes_host)
+    print("                                  ")
+    print("  **** Finished Step 1: Deploying Kubernetes Host Network. ****")
+    print("                                  ")
+except Exception as e:
+    print("stdout output:\n", e.output)
+    sys.exit()
 
 ################################################################################  
 ### 2. ADD VPC IDS TO CALL TO THE VPC PEERING MODULE
@@ -53,21 +58,29 @@ def getLocalVpcID():
     vpcIDRaw = requests.get(vpcRequest)
     return str(vpcIDRaw.text)
 
-vpc_acceptor_new=getLocalVpcID()
-vpc_requestor_new=ndep.vpc_id_kubernetes
-ndep.configureVpcPeeringCode(os.environ['TF_VAR_PATH_TO_CALL_TO_PEERING_MODULE'], 'main.tf', vpc_acceptor_new, vpc_requestor_new)
-print("                                  ")
-print("  **** Finished Step 2: Adding VPC IDs To The Call To The VPC Peering Module. ****")
-print("                                  ")
+try:
+    vpc_acceptor_new=getLocalVpcID()
+    vpc_requestor_new=ndep.vpc_id_kubernetes
+    ndep.configureVpcPeeringCode(os.environ['TF_VAR_PATH_TO_CALL_TO_PEERING_MODULE'], 'main.tf', vpc_acceptor_new, vpc_requestor_new)
+    print("                                  ")
+    print("  **** Finished Step 2: Adding VPC IDs To The Call To The VPC Peering Module. ****")
+    print("                                  ")
+except Exception as e:
+    print("stdout output:\n", e.output)
+    sys.exit()
 
 ################################################################################  
 ### 3. NOW DEPLOY THE VPC PEERING CONNECTION
 ################################################################################  
-ndep.deployVPC_PeeringConnection( os.environ['TF_VAR_COMMAND_TO_CALL_PEERING_MODULE'], os.environ['TF_VAR_PATH_TO_CALL_TO_PEERING_MODULE_SHORT'])
-nval.validateVpcPeeringConnection(ndep.my_peering_connection_id, ndep.acceptor_vpc_id, ndep.requestor_vpc_id)
-print("                                  ")
-print("  **** Finished Step 3: Deploying VPC Peering Connection. ****")
-print("                                  ")
+try:
+    ndep.deployVPC_PeeringConnection( os.environ['TF_VAR_COMMAND_TO_CALL_PEERING_MODULE'], os.environ['TF_VAR_PATH_TO_CALL_TO_PEERING_MODULE_SHORT'])
+    nval.validateVpcPeeringConnection(ndep.my_peering_connection_id, ndep.acceptor_vpc_id, ndep.requestor_vpc_id)
+    print("                                  ")
+    print("  **** Finished Step 3: Deploying VPC Peering Connection. ****")
+    print("                                  ")
+except Exception as e:
+    print("stdout output:\n", e.output)
+    sys.exit()
 
 ################################################################################  
 ### 4. CONFIGURE THE ACCEPTOR (AGILE CLOUD MANAGER)
@@ -110,75 +123,91 @@ def getSubnetIds(vpcId):
       subnetIdsList.append(thisSubnetId)
     return subnetIdsList
 
-myRtbNametag="acm-host"
-routeTableIdAcmHost=getRtbId(vpc_acceptor_new,myRtbNametag)
-mySgNameTag="acm-nodes"
-secGroupIdAcmNodes=getSgId(vpc_acceptor_new,mySgNameTag)
-mySubnetListAcmHost=getSubnets(vpc_acceptor_new)
-mySubnetIdsListAcmHost=getSubnetIds(vpc_acceptor_new)
-#Test the following before running the actual validation and deployment.
-#//Routes
-print("ndep.my_peering_connection_id is: " +ndep.my_peering_connection_id)
-print("routeTableIdAcmHost is: " +routeTableIdAcmHost)
-print("ndep.cidr_subnet_list_kubernetes is: " +str(ndep.cidr_subnet_list_kubernetes))
-#//Security groups
-print("path_to_acm_peering_config_module is: " +path_to_acm_peering_config_module)
-print("secGroupIdAcmNodes is: " +secGroupIdAcmNodes)
-print("ndep.security_group_id_kubernetes_nodes is: " +ndep.security_group_id_kubernetes_nodes)
-#The following is the original that we keep, after we confirm that the above variables are created in the test.
-nval.validateRoutePreReqsForAcceptorPeeringConnection(ndep.my_peering_connection_id, routeTableIdAcmHost, ndep.cidr_subnet_list_kubernetes)
-# PASTE THE PEERING CONNECTION ROUTE(S) INTO THE ACCEPTOR/ANSIBLE 
-ndep.creationLoopForVpcPeeringRoutes(ndep.cidr_subnet_list_kubernetes, ndep.my_peering_connection_id, path_to_acm_peering_config_module, routeTableIdAcmHost)
-# PASTE KUBERNETES NODE SECURITY GROUP INTO ANSIBLE SECURITY GROUP RULE
-ndep.configureVpcPeeringSecurityGroup(path_to_acm_peering_config_module, secGroupIdAcmNodes, ndep.security_group_id_kubernetes_nodes)
-print("                                  ")
-print("  **** Finished Step 4: Configuring Peering Routes & Security Group In The Acceptor (Agile Cloud Manager). ****")
-print("                                  ")
+try:
+    myRtbNametag="acm-host"
+    routeTableIdAcmHost=getRtbId(vpc_acceptor_new,myRtbNametag)
+    mySgNameTag="acm-nodes"
+    secGroupIdAcmNodes=getSgId(vpc_acceptor_new,mySgNameTag)
+    mySubnetListAcmHost=getSubnets(vpc_acceptor_new)
+    mySubnetIdsListAcmHost=getSubnetIds(vpc_acceptor_new)
+    #Test the following before running the actual validation and deployment.
+    #//Routes
+    print("ndep.my_peering_connection_id is: " +ndep.my_peering_connection_id)
+    print("routeTableIdAcmHost is: " +routeTableIdAcmHost)
+    print("ndep.cidr_subnet_list_kubernetes is: " +str(ndep.cidr_subnet_list_kubernetes))
+    #//Security groups
+    print("path_to_acm_peering_config_module is: " +path_to_acm_peering_config_module)
+    print("secGroupIdAcmNodes is: " +secGroupIdAcmNodes)
+    print("ndep.security_group_id_kubernetes_nodes is: " +ndep.security_group_id_kubernetes_nodes)
+    #The following is the original that we keep, after we confirm that the above variables are created in the test.
+    nval.validateRoutePreReqsForAcceptorPeeringConnection(ndep.my_peering_connection_id, routeTableIdAcmHost, ndep.cidr_subnet_list_kubernetes)
+    # PASTE THE PEERING CONNECTION ROUTE(S) INTO THE ACCEPTOR/ANSIBLE 
+    ndep.creationLoopForVpcPeeringRoutes(ndep.cidr_subnet_list_kubernetes, ndep.my_peering_connection_id, path_to_acm_peering_config_module, routeTableIdAcmHost)
+    # PASTE KUBERNETES NODE SECURITY GROUP INTO ANSIBLE SECURITY GROUP RULE
+    ndep.configureVpcPeeringSecurityGroup(path_to_acm_peering_config_module, secGroupIdAcmNodes, ndep.security_group_id_kubernetes_nodes)
+    print("                                  ")
+    print("  **** Finished Step 4: Configuring Peering Routes & Security Group In The Acceptor (Agile Cloud Manager). ****")
+    print("                                  ")
+except Exception as e:
+    print("stdout output:\n", e.output)
+    sys.exit()
 
 ################################################################################  
 ### 5. CONFIGURE THE REQUESTOR (KUBERNETES)
 ################################################################################  
 
-print("ndep.my_peering_connection_id is: " +ndep.my_peering_connection_id)
-print("ndep.route_table_id_kubernetes_host is: " +ndep.route_table_id_kubernetes_host)
-print("mySubnetListAcmHost is: " +str(mySubnetListAcmHost))
-print("ndep.my_peering_connection_id is: " +ndep.my_peering_connection_id)
-print("os.environ['TF_VAR_PATH_TO_K8S_MODULE'] is: " +os.environ['TF_VAR_PATH_TO_K8S_MODULE'])
-print("ndep.route_table_id_kubernetes_host is: " +ndep.route_table_id_kubernetes_host)
-print("os.environ['TF_VAR_PATH_TO_K8S_MODULE'] is: " +os.environ['TF_VAR_PATH_TO_K8S_MODULE'])
-print("ndep.security_group_id_kubernetes_nodes is: " +ndep.security_group_id_kubernetes_nodes)
-print("secGroupIdAcmNodes is: " +secGroupIdAcmNodes)
+try:
+    print("ndep.my_peering_connection_id is: " +ndep.my_peering_connection_id)
+    print("ndep.route_table_id_kubernetes_host is: " +ndep.route_table_id_kubernetes_host)
+    print("mySubnetListAcmHost is: " +str(mySubnetListAcmHost))
+    print("ndep.my_peering_connection_id is: " +ndep.my_peering_connection_id)
+    print("os.environ['TF_VAR_PATH_TO_K8S_MODULE'] is: " +os.environ['TF_VAR_PATH_TO_K8S_MODULE'])
+    print("ndep.route_table_id_kubernetes_host is: " +ndep.route_table_id_kubernetes_host)
+    print("os.environ['TF_VAR_PATH_TO_K8S_MODULE'] is: " +os.environ['TF_VAR_PATH_TO_K8S_MODULE'])
+    print("ndep.security_group_id_kubernetes_nodes is: " +ndep.security_group_id_kubernetes_nodes)
+    print("secGroupIdAcmNodes is: " +secGroupIdAcmNodes)
 
-#The following is the original that we keep, after we confirm that the above variables are created in the test.
-nval.validateRoutePreReqsForRequestorPeeringConnection(ndep.my_peering_connection_id, ndep.route_table_id_kubernetes_host, mySubnetListAcmHost)
-# PASTE THE PEERING CONNECTION ROUTE INTO THE REQUESTOR/KUBERNETES vpc.tf
-ndep.creationLoopForVpcPeeringRoutes(mySubnetListAcmHost, ndep.my_peering_connection_id, path_to_k8s_peering_config_module, ndep.route_table_id_kubernetes_host)
-# PASTE ANSIBLE NODE SECURITY GROUP INTO KUBERNETES SECURITY GROUP RULE
-ndep.configureVpcPeeringSecurityGroup(path_to_k8s_peering_config_module, ndep.security_group_id_kubernetes_nodes, secGroupIdAcmNodes)
-print("                                  ")
-print("  **** Finished Step 5: Configuring Peering Routes & Security Group In The Requestor (Kubernetes). ****")
-print("                                  ")
+    #The following is the original that we keep, after we confirm that the above variables are created in the test.
+    nval.validateRoutePreReqsForRequestorPeeringConnection(ndep.my_peering_connection_id, ndep.route_table_id_kubernetes_host, mySubnetListAcmHost)
+    # PASTE THE PEERING CONNECTION ROUTE INTO THE REQUESTOR/KUBERNETES vpc.tf
+    ndep.creationLoopForVpcPeeringRoutes(mySubnetListAcmHost, ndep.my_peering_connection_id, path_to_k8s_peering_config_module, ndep.route_table_id_kubernetes_host)
+    # PASTE ANSIBLE NODE SECURITY GROUP INTO KUBERNETES SECURITY GROUP RULE
+    ndep.configureVpcPeeringSecurityGroup(path_to_k8s_peering_config_module, ndep.security_group_id_kubernetes_nodes, secGroupIdAcmNodes)
+    print("                                  ")
+    print("  **** Finished Step 5: Configuring Peering Routes & Security Group In The Requestor (Kubernetes). ****")
+    print("                                  ")
+except Exception as e:
+    print("stdout output:\n", e.output)
+    sys.exit()
 
 ################################################################################  
 ### 6. DEPLOY THE CONFIG TO KUBERNETES HOST NETWORK
 ################################################################################  
-#Note the following merely deploys the config add-on module to supplement the larger k8s host network.  The following does NOT deploy the entire k8s host network.
-ndep.runTerraformOperation( os.environ['TF_VAR_COMMAND_TO_APPLY_K8S_PEER_CONFIG'], os.environ['TF_VAR_PATH_TO_CALL_K8SPEERCONFIG_MODULE'])
-ndep.checkOutputsOfKubernetesHostNetwork('python3 pipeline-kubeadm-network-output.py', os.environ['TF_VAR_PATH_TO_CALL_TO_K8S_MODULE'])
-nval.validateKubernetesHostNetwork(ndep.cidr_subnet_list_kubernetes, ndep.security_group_id_kubernetes_nodes, ndep.cidr_vpc_kubernetes, ndep.vpc_id_kubernetes, ndep.route_table_id_kubernetes_host)
-nval.validateRoutesAddedToKubernetesHostNetwork(ndep.route_table_id_kubernetes_host, mySubnetListAcmHost, myRegion)
-print("                                  ")
-print("  **** Finished Step 6: Deploy the config to the Requestor (Kubernetes) Host Network. ****")
-print("                                  ")
+try:
+    #Note the following merely deploys the config add-on module to supplement the larger k8s host network.  The following does NOT deploy the entire k8s host network.
+    ndep.runTerraformOperation( os.environ['TF_VAR_COMMAND_TO_APPLY_K8S_PEER_CONFIG'], os.environ['TF_VAR_PATH_TO_CALL_K8SPEERCONFIG_MODULE'])
+    ndep.checkOutputsOfKubernetesHostNetwork('python3 pipeline-kubeadm-network-output.py', os.environ['TF_VAR_PATH_TO_CALL_TO_K8S_MODULE'])
+    nval.validateKubernetesHostNetwork(ndep.cidr_subnet_list_kubernetes, ndep.security_group_id_kubernetes_nodes, ndep.cidr_vpc_kubernetes, ndep.vpc_id_kubernetes, ndep.route_table_id_kubernetes_host)
+    nval.validateRoutesAddedToKubernetesHostNetwork(ndep.route_table_id_kubernetes_host, mySubnetListAcmHost, myRegion)
+    print("                                  ")
+    print("  **** Finished Step 6: Deploy the config to the Requestor (Kubernetes) Host Network. ****")
+    print("                                  ")
+except Exception as e:
+    print("stdout output:\n", e.output)
+    sys.exit()
 
 ################################################################################  
 ### 7. DEPLOY THE CONFIG TO ACCEPTOR (AGILE CLOUD MANAGER HOST NETWORK)
 ################################################################################  
-ndep.runTerraformOperation( "python3 pipeline-acceptor-peering-config-apply.py", path_to_call_to_acm_peering_config_module)
+try:
+    ndep.runTerraformOperation( "python3 pipeline-acceptor-peering-config-apply.py", path_to_call_to_acm_peering_config_module)
 
-print("                                  ")
-print("  **** Finished Step 7: Deploy the config to the Acceptor (ACM) Host Network. ****")
-print("                                  ")
+    print("                                  ")
+    print("  **** Finished Step 7: Deploy the config to the Acceptor (ACM) Host Network. ****")
+    print("                                  ")
+except Exception as e:
+    print("stdout output:\n", e.output)
+    sys.exit()
 
 ################################################################################  
 ### 8. DEPLOY THE K8SADMIN MACHINE INSIDE THE ACCEPTOR (AGILE CLOUD MANAGER HOST NETWORK)
@@ -194,18 +223,29 @@ def getInternetGatewayId(vpcId):
     igId = response['InternetGateways'][0]['InternetGatewayId']
     return igId
 
-myIGId=getInternetGatewayId(vpc_acceptor_new)
-print("Internet Gateway myIGId is: "+myIGId)
-print("                                                                 ")
-ndep.addInstanceModule(command_to_call_k8sadmin_module, path_to_call_to_k8sadmin_module, 'remove-this-later--was-path-to-k8sadmin-iam-keys--now-an-env-variable', myIGId, secGroupIdAcmNodes, mySubnetIdsListAcmHost)
+try:
+    myIGId=getInternetGatewayId(vpc_acceptor_new)
+    print("Internet Gateway myIGId is: "+myIGId)
+    print("                                                                 ")
+    ndep.addInstanceModule(command_to_call_k8sadmin_module, path_to_call_to_k8sadmin_module, 'remove-this-later--was-path-to-k8sadmin-iam-keys--now-an-env-variable', myIGId, secGroupIdAcmNodes, mySubnetIdsListAcmHost)
 
-print("                                  ")
-print("  **** Finished Step 8: Deploy the k8sadmin machine inside the Acceptor (ACM) Host Network. ****")
-print("                                  ")
-print("  **** Sleeping 60 seconds to allow the k8sadmin machine to initialize before we try to communicate with it.  **** ")
-print("                                  ")
-time.sleep(60)
-print("  **** Now need to get the private IP of the k8s admin machine.  Then we will scp the key to it.  ")
+    print("                                  ")
+    print("  **** Finished Step 8: Deploy the k8sadmin machine inside the Acceptor (ACM) Host Network. ****")
+    print("                                  ")
+    print("  **** Sleeping 240 seconds to allow the k8sadmin machine to initialize before we try to communicate with it.  **** ")
+    print("                                  ")
+    time.sleep(60)
+    print("60 seconds have elapsed.  180 more to wait. ")
+    time.sleep(60)
+    print("120 seconds have elapsed.  120 more to wait. ")
+    time.sleep(60)
+    print("180 seconds have elapsed.  60 more to wait. ")
+    time.sleep(60)
+    print("240 seconds have elapsed. ")
+    print("  **** Now need to get the private IP of the k8s admin machine.  Then we will scp the key to it.  ")
+except Exception as e:
+    print("stdout output:\n", e.output)
+    sys.exit()
 
 
 import boto3
@@ -227,21 +267,27 @@ def transferTheKey(remoteIP, keyToMove, keyToUse, remoteUser):
         thetext=line.decode('utf-8').rstrip('\r|\n')
         decodedline=ansi_escape.sub('', thetext)
         print(decodedline)
+        if "Permission denied" in decodedline:  
+          print("The check for Permission denied works!  Now in the logical block which can be programmed to handle that.")
       else:
         break
 
-print("vpc_acceptor_new is: "+vpc_acceptor_new)
-remoteIP=getK8sadminPrivateIP(vpc_acceptor_new)
-print("k8sadmin remoteIP is: "+remoteIP)
-keyToMove="/home/terraform-host/stage-keys/kubernetes-host.pem"
-keyToUse="/home/terraform-host/.ssh/kubernetes-host.pem"
-remoteUser="kubernetes-host"
-print("About to transfer the key. ")
-transferTheKey(remoteIP,keyToMove,keyToUse,remoteUser)
-print("done transferring the key.  ")
-print("                                                    ")
-print("    ****  Still need to add a task that copies the key into the .ssh folder and makes it read-only after just now having been transfered into the target machine.  ****    ")
-print("                                                    ")
+try:
+    print("vpc_acceptor_new is: "+vpc_acceptor_new)
+    remoteIP=getK8sadminPrivateIP(vpc_acceptor_new)
+    print("k8sadmin remoteIP is: "+remoteIP)
+    keyToMove="/home/terraform-host/stage-keys/kubernetes-host.pem"
+    keyToUse="/home/terraform-host/.ssh/kubernetes-host.pem"
+    remoteUser="kubernetes-host"
+    print("About to transfer the key. ")
+    transferTheKey(remoteIP,keyToMove,keyToUse,remoteUser)
+    print("done transferring the key.  ")
+    print("                                                    ")
+    print("    ****  Still need to add a task that copies the key into the .ssh folder and makes it read-only after just now having been transfered into the target machine.  ****    ")
+    print("                                                    ")
+except Exception as e:
+    print("stdout output:\n", e.output)
+    sys.exit()
 
 ####    ###############################################################################################################################
 ####    ### ADD ADDITIONAL STEPS SUCH AS PING ALL NODES IN NETWORK FROM WITHIN EVERY NODE.  AND RUN/VALIDATE ANSIBLE PLAYBOOKS.  ETC. 
