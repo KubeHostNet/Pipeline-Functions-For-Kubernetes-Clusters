@@ -120,7 +120,7 @@ def checkOutputsOfKubernetesHostNetwork( scriptName, workingDir ):
             if "Outputs:" in decodedline:  
                 print("JENGA")
             global cidr_subnet_list_kubernetes
-            if "cidr_subnet_list_kubernetes_control" in decodedline:  
+            if "cidr_subnet_list_k8s_control" in decodedline:  
                 if not "[" in decodedline:  
                     #cidr_subnet_line_test = decodedline.findall("(?:\d{1,3}\.){3}\d{1,3}(?:/\d\d?)?",s)
                     cidr_subnet_line_test = decodedline[38:]
