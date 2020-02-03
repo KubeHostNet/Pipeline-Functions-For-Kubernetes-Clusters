@@ -122,7 +122,8 @@ def checkOutputsOfKubernetesHostNetwork( scriptName, workingDir ):
             global cidr_subnet_list_kubernetes
             if "cidr_subnet_list_kubernetes_control" in decodedline:  
                 if not "[" in decodedline:  
-                    cidr_subnet_line_test = decodedline.findall("(?:\d{1,3}\.){3}\d{1,3}(?:/\d\d?)?",s)
+                    #cidr_subnet_line_test = decodedline.findall("(?:\d{1,3}\.){3}\d{1,3}(?:/\d\d?)?",s)
+                    cidr_subnet_line_test = decodedline[38:]
                     print("cidr_subnet_line_test is: " +cidr_subnet_line_test)
                     try:
                         ip_addr = ipaddress.ip_address(cidr_subnet_line_test)
