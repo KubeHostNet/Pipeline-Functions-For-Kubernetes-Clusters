@@ -130,7 +130,7 @@ def checkOutputsOfKubernetesHostNetwork( scriptName, workingDir ):
                         print("ip_addr is: " +ip_addr)
                     except ValueError: # handle bad ip
                         print("ERROR PROCESSING IP.")
-                    cidr_subnet_list_kubernetes.append(decodedline)
+                    cidr_subnet_list_kubernetes.append(cidr_subnet_line_test)
                 if "[" in decodedline:  
                     inCidrBlock='true'
             if "cidr_subnet_list_kubernetes" in decodedline:  
