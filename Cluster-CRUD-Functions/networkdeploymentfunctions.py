@@ -120,21 +120,21 @@ def checkOutputsOfKubernetesHostNetwork( scriptName, workingDir ):
             if "Outputs:" in decodedline:  
                 print("JENGA")
             global cidr_subnet_list_kubernetes
-            if "cidr_subnet_list_k8s_control" in decodedline:  
-                if not "[" in decodedline:  
-                    #cidr_subnet_line_test = decodedline.findall("(?:\d{1,3}\.){3}\d{1,3}(?:/\d\d?)?",s)
-                    cidr_subnet_line_test = decodedline[31:]
-                    cidr_subnet_line_test = cidr_subnet_line_test.replace(" ", "")
-                    print("cidr_subnet_line_test is: " +cidr_subnet_line_test)
-                    try:
-                        ip_addr_to_test = cidr_subnet_line_test[:-3]
-                        ip_addr = ipaddress.ip_address(ip_addr_to_test)
-                        print("ip_addr_to_test is: " +ip_addr_to_test)
-                    except ValueError: # handle bad ip
-                        print("ERROR PROCESSING IP.")
-                    cidr_subnet_list_kubernetes.append(cidr_subnet_line_test)
-                if "[" in decodedline:  
-                    inCidrBlock='true'
+            #if "cidr_subnet_list_k8s_control" in decodedline:  
+            #    if not "[" in decodedline:  
+            #        #cidr_subnet_line_test = decodedline.findall("(?:\d{1,3}\.){3}\d{1,3}(?:/\d\d?)?",s)
+            #        cidr_subnet_line_test = decodedline[31:]
+            #        cidr_subnet_line_test = cidr_subnet_line_test.replace(" ", "")
+            #        print("cidr_subnet_line_test is: " +cidr_subnet_line_test)
+            #        try:
+            #            ip_addr_to_test = cidr_subnet_line_test[:-3]
+            #            ip_addr = ipaddress.ip_address(ip_addr_to_test)
+            #            print("ip_addr_to_test is: " +ip_addr_to_test)
+            #        except ValueError: # handle bad ip
+            #            print("ERROR PROCESSING IP.")
+            #        cidr_subnet_list_kubernetes.append(cidr_subnet_line_test)
+            #    if "[" in decodedline:  
+            #        inCidrBlock='true'
             if "cidr_subnet_list_kubernetes" in decodedline:  
                 if not "[" in decodedline:  
                     cidr_subnet_line_test = decodedline.findall("(?:\d{1,3}\.){3}\d{1,3}(?:/\d\d?)?",s)
