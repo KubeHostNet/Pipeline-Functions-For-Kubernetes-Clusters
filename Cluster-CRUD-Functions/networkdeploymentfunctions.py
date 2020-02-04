@@ -129,7 +129,7 @@ def checkOutputsOfKubernetesHostNetwork( scriptName, workingDir ):
                     try:
                         ip_addr_to_test = cidr_subnet_line_test[:-3]
                         ip_addr = ipaddress.ip_address(ip_addr_to_test)
-                        print("ip_addr is: " +ip_addr)
+                        print("ip_addr_to_test is: " +ip_addr_to_test)
                     except ValueError: # handle bad ip
                         print("ERROR PROCESSING IP.")
                     cidr_subnet_list_kubernetes.append(cidr_subnet_line_test)
